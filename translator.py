@@ -33,7 +33,7 @@ def register_webhook():
         print("Webhook registration failed:", e)
 
 
-register_webhook()
+# register_webhook()
 
 # ------------------------
 # Health check route
