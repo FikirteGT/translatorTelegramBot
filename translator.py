@@ -24,44 +24,25 @@ RESULTS_FILE = "results.txt"
 # ------------------------
 
 
-def log_conversation(chat_id, user_text, translated_text):
+def log_conversation(chat_id, english_text, amharic_text):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open(RESULTS_FILE, "a", encoding="utf-8") as f:
         f.write(
             f"[{timestamp}]\n"
             f"Chat ID: {chat_id}\n"
-            f"User: {user_text}\n"
-            f"Amharic: {translated_text}\n"
-            f"{'-'*40}\n"
+            f"English: {english_text}\n"
+            f"Amharic: {amharic_text}\n"
+            f"{'-' * 40}\n"
         )
 
 # ------------------------
-# Set webhook immediately on startup
-# ------------------------
-
-
-def register_webhook():
-    try:
-        requests.post(
-            f"{TELEGRAM_API}/setWebhook",
-            json={"url": f"{WEBHOOK_URL}/webhook"},
-            timeout=10
-        )
-        print("Webhook registered successfully.")
-    except Exception as e:
-        print("Webhook registration failed:", e)
-
-
-# register_webhook()
-
-# ------------------------
-# Health check route
+# Health check
 # ------------------------
 
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Bot is running!", 200
+    return "English → Amharic Translator Bot is running.", 200
 
 # ------------------------
 # Telegram webhook endpoint
@@ -72,45 +53,81 @@ def home():
 def webhook():
     data = request.get_json()
 
-    if not data:
-        return jsonify({"status": "no data"}), 400
+    if not data or "message" not in data:
+        return jsonify({"status": "ignored"}), 200
 
-    message = data.get("message")
+    message = data["message"]
+    chat_id = message["chat"]["id"]
+    text = message.get("text", "").strip()
 
-    if message and "text" in message:
-        chat_id = message["chat"]["id"]
-        user_text = message["text"]
+    # ------------------------
+    # /start command
+    # ------------------------
+    if text == "/start":
+        reply = (
+            "Selam 👋\n"
+            "Send me any English text and I will translate it to Amharic.\n\n"
+            "Examples:\n"
+            " - Hello, how are you?\n"
+            " - I live in Addis Ababa."
+        )
+        send_message(chat_id, reply)
+        return jsonify({"status": "ok"}), 200
 
-        if user_text.startswith("/"):
-            reply = "Send me any message and I will translate it to Amharic."
-        else:
-            try:
-                translated = GoogleTranslator(
-                    source="auto",
-                    target="am"
-                ).translate(user_text)
+    # ------------------------
+    # /help command
+    # ------------------------
+    if text == "/help":
+        reply = (
+            "I am an English → Amharic translator bot.\n"
+            "Just send English text, and I will reply in Amharic.\n\n"
+            "Commands:\n"
+            " /start  - introduction\n"
+            " /help   - this help message"
+        )
+        send_message(chat_id, reply)
+        return jsonify({"status": "ok"}), 200
 
-                reply = f"Translated to Amharic:\n{translated}"
+    # ------------------------
+    # Translation
+    # ------------------------
+    try:
+        amharic_text = GoogleTranslator(
+            source="auto",
+            target="am"
+        ).translate(text)
 
-                # 🔥 Log conversation
-                log_conversation(chat_id, user_text, translated)
+        reply = (
+            "✅ Translation:\n\n"
+            f"English:\n{text}\n\n"
+            f"Amharic:\n{amharic_text}"
+        )
 
-            except Exception:
-                reply = "Translation error occurred."
+        send_message(chat_id, reply)
+        log_conversation(chat_id, text, amharic_text)
 
-        try:
-            requests.post(
-                f"{TELEGRAM_API}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": reply
-                },
-                timeout=10
-            )
-        except Exception as e:
-            print("Failed to send message:", e)
+    except Exception as e:
+        print("Translation error:", e)
+        send_message(
+            chat_id,
+            "Sorry, I could not translate this right now. Please try again."
+        )
 
     return jsonify({"status": "ok"}), 200
+
+
+# ------------------------
+# Send message helper
+# ------------------------
+def send_message(chat_id, text):
+    try:
+        requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=10
+        )
+    except Exception as e:
+        print("Failed to send message:", e)
 
 
 if __name__ == "__main__":
