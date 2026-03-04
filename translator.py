@@ -2,6 +2,7 @@ import os
 import requests
 from flask import Flask, request, jsonify
 from deep_translator import GoogleTranslator
+from datetime import datetime
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
@@ -15,6 +16,24 @@ if not WEBHOOK_URL:
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 app = Flask(__name__)
+
+RESULTS_FILE = "results.txt"
+
+# ------------------------
+# Utility: log conversation
+# ------------------------
+
+
+def log_conversation(chat_id, user_text, translated_text):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(RESULTS_FILE, "a", encoding="utf-8") as f:
+        f.write(
+            f"[{timestamp}]\n"
+            f"Chat ID: {chat_id}\n"
+            f"User: {user_text}\n"
+            f"Amharic: {translated_text}\n"
+            f"{'-'*40}\n"
+        )
 
 # ------------------------
 # Set webhook immediately on startup
@@ -62,17 +81,19 @@ def webhook():
         chat_id = message["chat"]["id"]
         user_text = message["text"]
 
-        # Handle /start or any command
         if user_text.startswith("/"):
             reply = "Send me any message and I will translate it to Amharic."
         else:
             try:
                 translated = GoogleTranslator(
                     source="auto",
-                    target="am"   # 🔥 Changed to Amharic
+                    target="am"
                 ).translate(user_text)
 
                 reply = f"Translated to Amharic:\n{translated}"
+
+                # 🔥 Log conversation
+                log_conversation(chat_id, user_text, translated)
 
             except Exception:
                 reply = "Translation error occurred."
