@@ -1,4 +1,8 @@
 # 🌍 Telegram Translator Bot
+                ''''''''''''''''''''''''''''''
+                "https://t.me/F_translatorBot"
+                
+                ''''''''''''''''''''''''''''''
 
 A simple Telegram bot that automatically translates any message into Amharic 🇪🇹.
 
